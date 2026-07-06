@@ -86,7 +86,7 @@ npm run test
 npm run test:ci
 ```
 
-#### Fluxo de uma Requisição
+#### ➡️ Fluxo de uma Requisição
 ```
 Angular Form
    └─► HTTP Request          (API)
