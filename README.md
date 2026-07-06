@@ -2,7 +2,8 @@
 Exemplo de projeto CQRS-like de Vendas com Serilog e idempotência em C# ASP.NET Core 10 e Angular 17 e com banco de dados Postgres. 
 
 #### 🎨 Aqui está uma demonstração do projeto
-<img width="650" height="300" alt="Angular" src="https://github.com/user-attachments/assets/139dafbf-dc13-4dba-9378-8b03bd125f09" />
+<img width="700" height="350" alt="Angular" src="https://github.com/user-attachments/assets/e486eafe-fcb6-4884-8d3f-663dd80e796e" />
+
 
 #### 💬 Requisitos do Projeto
 - Realizar Migrations EntityFramework .NET
