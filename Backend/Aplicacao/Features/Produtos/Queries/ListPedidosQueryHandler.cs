@@ -1,0 +1,1 @@
+﻿// Espaço reservado removido para evitar erros de construção. Deixado em branco intencionalmente
