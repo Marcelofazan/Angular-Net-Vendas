@@ -99,6 +99,15 @@ npm run lint
 npm run test
 npm run test:ci
 ```
+## 📁 Scripts 
+#### 🔍 Executar Testes Unitários
+- Executar Testes do PowerShell
+
+VSCode Terminal [4]
+```bash
+cd scripts
+.\verify.ps1
+```
 
 #### Observabilidade & Correlation ID
 - Cada requisição recebe/propaga `X-Correlation-ID` via middleware ASP.NET Core e interceptor Angular. O header é exibido também no banner de feedback quando erros ocorrem.
