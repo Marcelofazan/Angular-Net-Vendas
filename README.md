@@ -1,4 +1,4 @@
-## 🌐 Angular17-Vendas-Api10-EF
+## 🌐 Angular17-Vendas-Api10-EF-mvp
 Exemplo de projeto CQRS-like de Vendas com Serilog e idempotência em C# ASP.NET Core 10 e Angular 17 e com banco de dados Postgres. 
 
 #### 🎨 Aqui está uma demonstração do projeto
