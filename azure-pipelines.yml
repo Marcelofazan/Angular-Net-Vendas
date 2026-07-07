@@ -21,31 +21,46 @@ stages:
       displayName: 'Install Node.js'
 
     - script: |
-        # Busca automaticamente a pasta que contém o arquivo angular.json
+        # 1. Localiza a pasta onde o projeto Angular está
         ANGULAR_PATH=$(find . -name "angular.json" -exec dirname {} \;)
         
         if [ -z "$ANGULAR_PATH" ]; then
-          echo "ERRO: O arquivo angular.json não foi encontrado em nenhuma pasta do repositório!"
-          echo "Arquivos na raiz para verificação:"
-          ls -la
+          echo "ERRO: O arquivo angular.json não foi encontrado!"
           exit 1
         fi
         
-        echo "##vso[task.setvariable variable=detectedAngularDir]$ANGULAR_PATH"
         echo "Projeto Angular localizado em: $ANGULAR_PATH"
-        
         cd "$ANGULAR_PATH"
         
+        # 2. Instala dependências
         if [ -f package-lock.json ]; then
           npm ci
         else
           npm install
         fi
         
+        # 3. Executa o build
         npm run build -- --configuration production
-      displayName: 'Angular 17 Build (Auto-Detect)'
+        
+        # 4. MAPEAMENTO DINÂMICO DA PASTA DIST (Resolve o erro Path does not exist)
+        # Busca o diretório exato dentro de 'dist' que contém o arquivo index.html
+        DIST_TARGET=$(find dist -name "index.html" -exec dirname {} \; | head -n 1)
+        
+        if [ -z "$DIST_TARGET" ]; then
+          echo "ERRO: O build do Angular não gerou nenhum arquivo index.html dentro da pasta dist!"
+          ls -la dist/
+          exit 1
+        fi
+        
+        # Cria um caminho absoluto para o Azure Pipelines não se perder
+        FULL_DIST_PATH="$(pwd)/$DIST_TARGET"
+        echo "Arquivos de produção encontrados em: $FULL_DIST_PATH"
+        
+        # Cria a variável que a tarefa 'publish' vai ler no próximo passo
+        echo "##vso[task.setvariable variable=detectedAngularDist]$FULL_DIST_PATH"
+      displayName: 'Angular 17 Build (Auto-Detect Dist)'
 
-    - publish: $(detectedAngularDir)/dist/browser
+    - publish: $(detectedAngularDist)
       artifact: 'angular-dist'
       displayName: 'Publish Angular Artifacts'
 
