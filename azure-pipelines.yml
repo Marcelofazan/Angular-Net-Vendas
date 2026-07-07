@@ -1,98 +1,107 @@
 trigger:
-  - main
+- main  # Ajuste para 'master' se o nome da sua branch principal for master
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
   buildConfiguration: 'Release'
+  npm_config_cache: $(Pipeline.Workspace)/.npm
   dotnetVersion: '10.0.x'
 
-stages:
-- stage: Build_Angular
-  displayName: 'Build Angular Application'
-  jobs:
-  - job: BuildClient
-    displayName: 'npm install and build'
-    steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '20.x'
-      displayName: 'Install Node.js'
+steps:
+# ================= CONFIGURAÇÃO DE AMBIENTE =================
+- task: UseNode@1
+  inputs:
+    version: '20.x' # Node 20 é o ideal e recomendado para Angular 17
+  displayName: 'Ambiente: Instalar Node.js'
 
-    - script: |
-        # 1. Localiza a pasta onde o projeto Angular está
-        ANGULAR_PATH=$(find . -name "angular.json" -exec dirname {} \;)
-        
-        if [ -z "$ANGULAR_PATH" ]; then
-          echo "ERRO: O arquivo angular.json não foi encontrado!"
-          exit 1
-        fi
-        
-        echo "Projeto Angular localizado em: $ANGULAR_PATH"
-        cd "$ANGULAR_PATH"
-        
-        # 2. Instala dependências
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
-        
-        # 3. Executa o build
-        npm run build -- --configuration production
-        
-        # 4. MAPEAMENTO DINÂMICO DA PASTA DIST (Resolve o erro Path does not exist)
-        # Busca o diretório exato dentro de 'dist' que contém o arquivo index.html
-        DIST_TARGET=$(find dist -name "index.html" -exec dirname {} \; | head -n 1)
-        
-        if [ -z "$DIST_TARGET" ]; then
-          echo "ERRO: O build do Angular não gerou nenhum arquivo index.html dentro da pasta dist!"
-          ls -la dist/
-          exit 1
-        fi
-        
-        # Cria um caminho absoluto para o Azure Pipelines não se perder
-        FULL_DIST_PATH="$(pwd)/$DIST_TARGET"
-        echo "Arquivos de produção encontrados em: $FULL_DIST_PATH"
-        
-        # Cria a variável que a tarefa 'publish' vai ler no próximo passo
-        echo "##vso[task.setvariable variable=detectedAngularDist]$FULL_DIST_PATH"
-      displayName: 'Angular 17 Build (Auto-Detect Dist)'
+- task: UseDotNet@2
+  inputs:
+    version: '$(dotnetVersion)'
+    packageType: 'sdk'
+  displayName: 'Ambiente: Instalar .NET 10 SDK'
 
-    - publish: $(detectedAngularDist)
-      artifact: 'angular-dist'
-      displayName: 'Publish Angular Artifacts'
+# Cache de Dependências do NPM (Apenas para o Frontend Angular)
+- task: Cache@2
+  inputs:
+    key: 'npm | "$(Agent.OS)" | Frontend/package.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+    path: $(npm_config_cache)
+  displayName: 'Garantir Cache do NPM'
 
-- stage: Build_DotNet
-  displayName: 'Build and Publish .NET API'
-  jobs:
-  - job: BuildAPI
-    displayName: 'dotnet build and publish'
-    steps:
-    - task: UseDotNet@2
-      inputs:
-        version: '$(dotnetVersion)'
-        packageType: 'sdk'
-      displayName: 'Install .NET SDK'
+# ================= PIPELINE DO FRONTEND (ANGULAR 17) =================
+- script: npm install --legacy-peer-deps
+  workingDirectory: '$(Build.SourcesDirectory)/Frontend'
+  displayName: 'Frontend: Instalar dependências'
 
-    - script: |
-        # Busca automaticamente a pasta que contém o arquivo de solução (.sln) ou projeto (.csproj)
-        NET_PATH=$(find . -name "*.sln" -o -name "*.csproj" -exec dirname {} \; | head -n 1)
-        
-        if [ -z "$NET_PATH" ]; then
-          echo "ERRO: Nenhum arquivo .sln ou .csproj foi encontrado no repositório!"
-          exit 1
-        fi
-        
-        echo "Projeto .NET localizado em: $NET_PATH"
-        cd "$NET_PATH"
-        
-        dotnet restore
-        dotnet build --configuration $(buildConfiguration)
-        dotnet publish --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/ApiPublish
-      displayName: '.NET 10 Build and Publish (Auto-Detect)'
+- script: npm run build -- --configuration production
+  workingDirectory: '$(Build.SourcesDirectory)/Frontend'
+  displayName: 'Frontend: Compilar o projeto Angular'
 
-    - publish: $(Build.ArtifactStagingDirectory)/ApiPublish
-      artifact: 'dotnet-api'
-      displayName: 'Publish .NET Artifacts'
+# Se você tiver testes unitários no Angular, remova o '#' da linha abaixo
+# - script: npm test -- --watch=false --browsers=ChromeHeadless
+#   workingDirectory: '$(Build.SourcesDirectory)/Frontend'
+#   displayName: 'Frontend: Executar testes'
+
+# ================= PIPELINE DO BACKEND (.NET 10) =================
+- script: |
+    # Busca a pasta que contém o arquivo de solução ou projeto principal
+    NET_PATH=$(find . -name "*.sln" -o -name "*.csproj" -exec dirname {} \; | head -n 1)
+    echo "##vso[task.setvariable variable=detectedNetDir]$NET_PATH"
+    
+    cd "$NET_PATH"
+    dotnet restore
+  workingDirectory: '$(Build.SourcesDirectory)/Backend'
+  displayName: 'Backend: Restaurar pacotes Nuget'
+
+- script: dotnet build --configuration $(buildConfiguration) --no-restore
+  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  displayName: 'Backend: Compilar o projeto .NET'
+
+- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
+  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  displayName: 'Backend: Executar testes'
+  condition: always()
+
+- script: dotnet publish --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/ApiPublish --no-build
+  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  displayName: 'Backend: Publicar para Deploy'
+
+# ================= SALVAR ARTEFATOS PARA DEPLOY =================
+- script: |
+    # Mapeia dinamicamente onde o Angular 17 gerou o index.html (evita erro de pasta inexistente)
+    DIST_TARGET=$(find Frontend/dist -name "index.html" -exec dirname {} \; | head -n 1)
+    echo "##vso[task.setvariable variable=detectedAngularDist]$DIST_TARGET"
+  displayName: 'Mapear Saída do Angular'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.SourcesDirectory)/$(detectedAngularDist)'
+    ArtifactName: 'frontend-drop'
+    publishLocation: 'Container'
+  displayName: 'Publicar Artefato: Frontend'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/ApiPublish'
+    ArtifactName: 'backend-drop'
+    publishLocation: 'Container'
+  displayName: 'Publicar Artefato: Backend'
+
+# ================= AUTO DEPLOY NO RENDER VIA WEBHOOK =================
+- script: |
+    echo "Sinalizando o Render para puxar as atualizações..."
+    
+    # IMPORTANTE: Crie essas variáveis secretas no painel do seu pipeline no Azure DevOps
+    # ou substitua diretamente pelas suas URLs do Render (Settings > Deploy Hook)
+    
+    curl -X POST "$(RENDER_FRONTEND_HOOK)"
+    echo -e "\nFrontend atualizado."
+    
+    curl -X POST "$(RENDER_BACKEND_HOOK)"
+    echo -e "\nBackend atualizado."
+  displayName: 'Render: Disparar Auto-Deploy Webhook'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')) 
+  # O deploy só acontece se o build passar E se for na branch principal (main/master)
