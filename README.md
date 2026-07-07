@@ -60,6 +60,10 @@ Angular Form
 ```
 
 
+#### Observabilidade & Correlation ID
+- Cada requisição recebe/propaga `X-Correlation-ID` via middleware ASP.NET Core e interceptor Angular. O header é exibido também no banner de feedback quando erros ocorrem.
+- Serilog está configurado para Console (JSON) e arquivo (`logs/`). Use o correlation ID para rastrear requisições end-to-end.
+  
 ## 📁 Frontend 
 
 #### 📋 O que voçê vai ver nesse Projeto
@@ -120,6 +124,3 @@ cd scripts
 ./scripts/verify.sh
 ```
 
-#### Observabilidade & Correlation ID
-- Cada requisição recebe/propaga `X-Correlation-ID` via middleware ASP.NET Core e interceptor Angular. O header é exibido também no banner de feedback quando erros ocorrem.
-- Serilog está configurado para Console (JSON) e arquivo (`logs/`). Use o correlation ID para rastrear requisições end-to-end.
