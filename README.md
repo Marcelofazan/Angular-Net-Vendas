@@ -101,13 +101,18 @@ npm run test:ci
 ```
 ## 📁 Scripts 
 #### 🔍 Executar Testes Unitários
-- Executar Testes do PowerShell
-
+- Executar Testes script PowerShell
 VSCode Terminal [4]
 ```bash
 cd scripts
 .\verify.ps1
 ```
+
+- Executar Testes script Mac/Linux
+```bash
+./scripts/verify.sh
+```
+Você pode pular etapas exportando `SKIP_BACKEND_TESTS=1`, `SKIP_FRONTEND_LINT=1` ou `SKIP_FRONTEND_TESTS=1` (ou passando os switches no PowerShell).
 
 #### Observabilidade & Correlation ID
 - Cada requisição recebe/propaga `X-Correlation-ID` via middleware ASP.NET Core e interceptor Angular. O header é exibido também no banner de feedback quando erros ocorrem.
