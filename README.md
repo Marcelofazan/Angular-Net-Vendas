@@ -102,11 +102,13 @@ npm run test:ci
 ## 📁 Scripts 
 #### 🔍 Executar Testes Unitários
 - Executar Testes script PowerShell
+- 
 VSCode Terminal [4]
 ```bash
 cd scripts
 .\verify.ps1
 ```
+
 - Você pode pular etapas exportando `SkipBackendTests`, `SkipFrontendTests` ou `SkipFrontendTests` (ou passando os switches no PowerShell).
 ```bash
 .\verify.ps1 -SkipBackendTests
